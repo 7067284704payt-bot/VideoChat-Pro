@@ -1,0 +1,192 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global safety net: default-deny everything
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidUserProfile(data) {
+      return data.userId is string && data.userId == request.auth.uid &&
+             data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 50 &&
+             (!('photoUrl' in data) || (data.photoUrl is string && data.photoUrl.size() <= 500)) &&
+             data.country is string && data.country.size() >= 1 && data.country.size() <= 40 &&
+             (!('bio' in data) || (data.bio is string && data.bio.size() <= 200)) &&
+             data.diamonds is int && data.diamonds >= 0 && data.diamonds <= 100000000 &&
+             (!('lastRewardClaimedAt' in data) || (data.lastRewardClaimedAt is timestamp && data.lastRewardClaimedAt <= request.time)) &&
+             data.beautyFilterEnabled is bool &&
+             data.hdVideoEnabled is bool &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidConversation(data, userId, creatorId) {
+      return data.userId is string && data.userId == userId &&
+             data.creatorId is string && data.creatorId == creatorId &&
+             data.creatorName is string && data.creatorName.size() >= 1 && data.creatorName.size() <= 50 &&
+             data.creatorCountry is string && data.creatorCountry.size() >= 1 && data.creatorCountry.size() <= 40 &&
+             data.lastMessage is string && data.lastMessage.size() <= 500 &&
+             data.unreadCount is int && data.unreadCount >= 0 && data.unreadCount <= 999 &&
+             data.favorite is bool &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidChatMessage(data, userId, creatorId) {
+      return data.userId is string && data.userId == userId &&
+             data.creatorId is string && data.creatorId == creatorId &&
+             data.sender in ['USER', 'CREATOR'] &&
+             data.text is string && data.text.size() >= 1 && data.text.size() <= 1000 &&
+             data.giftDiamonds is int && data.giftDiamonds >= 0 && data.giftDiamonds <= 100000 &&
+             data.createdAt is timestamp && data.createdAt <= request.time;
+    }
+
+    function isValidCallRecord(data, userId) {
+      return data.userId is string && data.userId == userId &&
+             data.creatorId is string && isValidId(data.creatorId) &&
+             data.creatorName is string && data.creatorName.size() >= 1 && data.creatorName.size() <= 50 &&
+             data.creatorCountry is string && data.creatorCountry.size() >= 1 && data.creatorCountry.size() <= 40 &&
+             data.callType in ['VIDEO', 'AUDIO'] &&
+             data.status in ['CONNECTED', 'COMPLETED', 'MISSED', 'DECLINED'] &&
+             data.durationSeconds is int && data.durationSeconds >= 0 && data.durationSeconds <= 86400 &&
+             data.diamondsSpent is int && data.diamondsSpent >= 0 && data.diamondsSpent <= 1000000 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    match /users/{userId} {
+      allow get: if isOwner(userId) && isValidId(userId);
+      allow list: if false;
+
+      allow create: if isOwner(userId) &&
+                       isValidId(userId) &&
+                       incoming().keys().hasAll([
+                         'userId', 'displayName', 'country', 'diamonds',
+                         'beautyFilterEnabled', 'hdVideoEnabled', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'userId', 'displayName', 'photoUrl', 'country', 'bio', 'diamonds',
+                         'lastRewardClaimedAt', 'beautyFilterEnabled', 'hdVideoEnabled', 'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidUserProfile(incoming());
+
+      allow update: if isOwner(userId) &&
+                       isValidId(userId) &&
+                       isValidUserProfile(incoming()) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'displayName', 'photoUrl', 'country', 'bio', 'diamonds',
+                         'lastRewardClaimedAt', 'beautyFilterEnabled', 'hdVideoEnabled', 'updatedAt'
+                       ]);
+
+      allow delete: if isOwner(userId) && isValidId(userId);
+
+      match /conversations/{creatorId} {
+        allow get: if isOwner(userId) && isValidId(userId) && isValidId(creatorId);
+        allow list: if isOwner(userId) && isValidId(userId);
+
+        allow create: if isOwner(userId) &&
+                         isValidId(userId) &&
+                         isValidId(creatorId) &&
+                         incoming().keys().hasAll([
+                           'userId', 'creatorId', 'creatorName', 'creatorCountry',
+                           'lastMessage', 'unreadCount', 'favorite', 'createdAt', 'updatedAt'
+                         ]) &&
+                         incoming().keys().hasOnly([
+                           'userId', 'creatorId', 'creatorName', 'creatorCountry',
+                           'lastMessage', 'unreadCount', 'favorite', 'createdAt', 'updatedAt'
+                         ]) &&
+                         isValidConversation(incoming(), userId, creatorId);
+
+        allow update: if isOwner(userId) &&
+                         isValidId(userId) &&
+                         isValidId(creatorId) &&
+                         isValidConversation(incoming(), userId, creatorId) &&
+                         incoming().userId == existing().userId &&
+                         incoming().creatorId == existing().creatorId &&
+                         incoming().createdAt == existing().createdAt &&
+                         incoming().diff(existing()).affectedKeys().hasOnly([
+                           'creatorName', 'creatorCountry', 'lastMessage', 'unreadCount', 'favorite', 'updatedAt'
+                         ]);
+
+        allow delete: if isOwner(userId) && isValidId(userId) && isValidId(creatorId);
+
+        match /messages/{messageId} {
+          allow get: if isOwner(userId) && isValidId(userId) && isValidId(creatorId) && isValidId(messageId);
+          allow list: if isOwner(userId) && isValidId(userId) && isValidId(creatorId);
+
+          allow create: if isOwner(userId) &&
+                           isValidId(userId) &&
+                           isValidId(creatorId) &&
+                           isValidId(messageId) &&
+                           incoming().keys().hasAll([
+                             'userId', 'creatorId', 'sender', 'text', 'giftDiamonds', 'createdAt'
+                           ]) &&
+                           incoming().keys().hasOnly([
+                             'userId', 'creatorId', 'sender', 'text', 'giftDiamonds', 'createdAt'
+                           ]) &&
+                           isValidChatMessage(incoming(), userId, creatorId);
+
+          allow update: if false;
+          allow delete: if isOwner(userId) && isValidId(userId) && isValidId(creatorId) && isValidId(messageId);
+        }
+      }
+
+      match /calls/{callId} {
+        allow get: if isOwner(userId) && isValidId(userId) && isValidId(callId);
+        allow list: if isOwner(userId) && isValidId(userId);
+
+        allow create: if isOwner(userId) &&
+                         isValidId(userId) &&
+                         isValidId(callId) &&
+                         incoming().keys().hasAll([
+                           'userId', 'creatorId', 'creatorName', 'creatorCountry',
+                           'callType', 'status', 'durationSeconds', 'diamondsSpent',
+                           'createdAt', 'updatedAt'
+                         ]) &&
+                         incoming().keys().hasOnly([
+                           'userId', 'creatorId', 'creatorName', 'creatorCountry',
+                           'callType', 'status', 'durationSeconds', 'diamondsSpent',
+                           'createdAt', 'updatedAt'
+                         ]) &&
+                         isValidCallRecord(incoming(), userId);
+
+        allow update: if isOwner(userId) &&
+                         isValidId(userId) &&
+                         isValidId(callId) &&
+                         isValidCallRecord(incoming(), userId) &&
+                         existing().status == 'CONNECTED' &&
+                         incoming().userId == existing().userId &&
+                         incoming().creatorId == existing().creatorId &&
+                         incoming().callType == existing().callType &&
+                         incoming().createdAt == existing().createdAt &&
+                         incoming().diff(existing()).affectedKeys().hasOnly([
+                           'status', 'durationSeconds', 'diamondsSpent', 'updatedAt'
+                         ]);
+
+        allow delete: if isOwner(userId) && isValidId(userId) && isValidId(callId);
+      }
+    }
+  }
+}

@@ -1,0 +1,246 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Authenticated user profile, diamond wallet balance, daily reward timer, and call preferences.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Authenticated Firebase user UID."
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Display name shown in profile and calls."
+        },
+        "photoUrl": {
+          "type": "string",
+          "description": "Optional Google profile photo URL."
+        },
+        "country": {
+          "type": "string",
+          "description": "User selected country or region."
+        },
+        "bio": {
+          "type": "string",
+          "description": "Optional user bio."
+        },
+        "diamonds": {
+          "type": "integer",
+          "description": "Current diamond wallet balance."
+        },
+        "lastRewardClaimedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when daily reward was last claimed (FieldValue.serverTimestamp())."
+        },
+        "beautyFilterEnabled": {
+          "type": "boolean",
+          "description": "Whether beauty lighting filter is active for calls."
+        },
+        "hdVideoEnabled": {
+          "type": "boolean",
+          "description": "Whether HD 1080p video mode is enabled."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of profile creation (FieldValue.serverTimestamp())."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of last update (FieldValue.serverTimestamp())."
+        }
+      },
+      "required": [
+        "userId",
+        "displayName",
+        "country",
+        "diamonds",
+        "beautyFilterEnabled",
+        "hdVideoEnabled",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Conversation": {
+      "title": "Conversation",
+      "description": "Chat thread summary between the authenticated user and a creator.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Owner user UID."
+        },
+        "creatorId": {
+          "type": "string",
+          "description": "Creator identifier matching document ID."
+        },
+        "creatorName": {
+          "type": "string",
+          "description": "Creator display name."
+        },
+        "creatorCountry": {
+          "type": "string",
+          "description": "Creator country name."
+        },
+        "lastMessage": {
+          "type": "string",
+          "description": "Most recent message preview text."
+        },
+        "unreadCount": {
+          "type": "integer",
+          "description": "Number of unread messages in thread."
+        },
+        "favorite": {
+          "type": "boolean",
+          "description": "Whether creator is starred/favorited."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of thread creation (FieldValue.serverTimestamp())."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of latest activity (FieldValue.serverTimestamp())."
+        }
+      },
+      "required": [
+        "userId",
+        "creatorId",
+        "creatorName",
+        "creatorCountry",
+        "lastMessage",
+        "unreadCount",
+        "favorite",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "ChatMessage": {
+      "title": "ChatMessage",
+      "description": "Individual chat message or diamond gift event inside a conversation.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Denormalized owner user UID."
+        },
+        "creatorId": {
+          "type": "string",
+          "description": "Parent creator conversation ID."
+        },
+        "sender": {
+          "type": "string",
+          "enum": ["USER", "CREATOR"],
+          "description": "Message sender role."
+        },
+        "text": {
+          "type": "string",
+          "description": "Message body."
+        },
+        "giftDiamonds": {
+          "type": "integer",
+          "description": "Diamonds gifted with this message (0 if regular message)."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of message creation (FieldValue.serverTimestamp())."
+        }
+      },
+      "required": [
+        "userId",
+        "creatorId",
+        "sender",
+        "text",
+        "giftDiamonds",
+        "createdAt"
+      ]
+    },
+    "CallRecord": {
+      "title": "CallRecord",
+      "description": "Video or audio call log entry for the authenticated user.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Owner user UID."
+        },
+        "creatorId": {
+          "type": "string",
+          "description": "Target creator ID."
+        },
+        "creatorName": {
+          "type": "string",
+          "description": "Target creator display name."
+        },
+        "creatorCountry": {
+          "type": "string",
+          "description": "Target creator country."
+        },
+        "callType": {
+          "type": "string",
+          "enum": ["VIDEO", "AUDIO"],
+          "description": "Type of call."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["CONNECTED", "COMPLETED", "MISSED", "DECLINED"],
+          "description": "Call lifecycle state."
+        },
+        "durationSeconds": {
+          "type": "integer",
+          "description": "Call duration in seconds."
+        },
+        "diamondsSpent": {
+          "type": "integer",
+          "description": "Diamonds spent during the call."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of call start (FieldValue.serverTimestamp())."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of call update (FieldValue.serverTimestamp())."
+        }
+      },
+      "required": [
+        "userId",
+        "creatorId",
+        "creatorName",
+        "creatorCountry",
+        "callType",
+        "status",
+        "durationSeconds",
+        "diamondsSpent",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Per-user profile, diamond wallet, and preferences."
+    },
+    "/users/{userId}/conversations/{creatorId}": {
+      "schema": { "$ref": "#/entities/Conversation" },
+      "description": "Per-user chat threads with creators."
+    },
+    "/users/{userId}/conversations/{creatorId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/ChatMessage" },
+      "description": "Messages inside a creator conversation."
+    },
+    "/users/{userId}/calls/{callId}": {
+      "schema": { "$ref": "#/entities/CallRecord" },
+      "description": "Per-user video and audio call history."
+    }
+  }
+}

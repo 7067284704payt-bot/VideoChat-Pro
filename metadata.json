@@ -1,0 +1,6 @@
+{
+  "name": "VideoChat Pro",
+  "description": "Connect, chat, and make live video calls worldwide with daily diamond rewards.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
