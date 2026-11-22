@@ -1,4 +1,5 @@
 import com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesStrategy
+import java.util.Properties
 
 plugins {
   alias(libs.plugins.android.application)
@@ -20,6 +21,36 @@ android {
     versionName = "1.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+    val envProps = Properties().apply {
+      val envFile = rootProject.file(".env")
+      if (envFile.exists()) {
+        envFile.inputStream().use { load(it) }
+      }
+    }
+    fun distributionConfig(name: String, default: String): String {
+      return (providers.gradleProperty(name).orNull
+        ?: System.getenv(name)
+        ?: envProps.getProperty(name)
+        ?: default)
+        .trim()
+        .replace("\\", "\\\\")
+        .replace("\"", "\\\"")
+    }
+
+    buildConfigField("String", "PLAY_STORE_URL", "\"${distributionConfig("VIDEOCHAT_PLAY_STORE_URL", "")}\"")
+    buildConfigField("String", "APK_DOWNLOAD_URL", "\"${distributionConfig("VIDEOCHAT_APK_DOWNLOAD_URL", "")}\"")
+    buildConfigField("String", "LATEST_VERSION_NAME", "\"${distributionConfig("VIDEOCHAT_LATEST_VERSION_NAME", "1.0")}\"")
+    buildConfigField(
+      "int",
+      "LATEST_VERSION_CODE",
+      distributionConfig("VIDEOCHAT_LATEST_VERSION_CODE", "1").toIntOrNull()?.toString() ?: "1"
+    )
+    buildConfigField(
+      "String",
+      "UPDATE_RELEASE_NOTES",
+      "\"${distributionConfig("VIDEOCHAT_UPDATE_NOTES", "Official VideoChat Pro release with HD live video calls and 24-hour free diamond rewards.")}\""
+    )
   }
 
   // Do not remove or modify these signingConfigs. They are necessary for building, installing,
@@ -97,6 +128,7 @@ dependencies {
   implementation(libs.androidx.compose.ui.graphics)
   implementation(libs.androidx.compose.ui.tooling.preview)
   implementation(libs.androidx.core.ktx)
+  implementation(libs.androidx.datastore.preferences)
   implementation(libs.androidx.lifecycle.runtime.compose)
   implementation(libs.androidx.lifecycle.runtime.ktx)
   implementation(libs.androidx.lifecycle.viewmodel.compose)

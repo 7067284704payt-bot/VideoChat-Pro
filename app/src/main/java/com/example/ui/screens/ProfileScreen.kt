@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Logout
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Diamond
@@ -31,6 +32,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -54,10 +56,12 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.example.data.distribution.AppDistributionState
 import com.example.data.model.CreatorCatalog
 import com.example.data.model.UserProfile
 import com.example.ui.components.AdsterraAdUnit
 import com.example.ui.components.AdsterraBannerCard
+import com.example.ui.components.DownloadAppFeatureCard
 import com.example.ui.theme.BadgeRed
 import com.example.ui.theme.CardSurface
 import com.example.ui.theme.CardSurfaceElevated
@@ -79,8 +83,13 @@ import com.example.ui.viewmodel.VideoChatViewModel
 fun ProfileScreen(
     userProfileState: UiState<UserProfile?>,
     rewardTimer: RewardTimerState,
+    distributionState: AppDistributionState,
     onClaimDailyReward: () -> Unit,
     onSaveProfile: (displayName: String, country: String, bio: String, beauty: Boolean, hd: Boolean) -> Unit,
+    onDownloadAppClick: () -> Unit,
+    onUpdateAppClick: () -> Unit,
+    onShareAppClick: () -> Unit,
+    onOpenSettings: () -> Unit,
     onSignOut: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -130,32 +139,47 @@ fun ProfileScreen(
                         border = BorderStroke(1.dp, VioletGlow.copy(alpha = 0.45f)),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(18.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            if (!profile?.photoUrl.isNullOrBlank()) {
-                                AsyncImage(
-                                    model = profile.photoUrl,
-                                    contentDescription = "Profile avatar",
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier
-                                        .size(82.dp)
-                                        .clip(CircleShape)
+                        Box(modifier = Modifier.fillMaxWidth()) {
+                            IconButton(
+                                onClick = onOpenSettings,
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(8.dp)
+                                    .testTag("open_settings_button")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Settings,
+                                    contentDescription = "Open Settings",
+                                    tint = TextPrimary
                                 )
-                            } else {
-                                Box(
-                                    modifier = Modifier
-                                        .size(82.dp)
-                                        .clip(CircleShape)
-                                        .background(Brush.linearGradient(listOf(VioletPrimary, ElectricBlue))),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(Icons.Rounded.Person, null, tint = TextPrimary, modifier = Modifier.size(42.dp))
-                                }
                             }
+
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(18.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                if (!profile?.photoUrl.isNullOrBlank()) {
+                                    AsyncImage(
+                                        model = profile.photoUrl,
+                                        contentDescription = "Profile avatar",
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier
+                                            .size(82.dp)
+                                            .clip(CircleShape)
+                                    )
+                                } else {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(82.dp)
+                                            .clip(CircleShape)
+                                            .background(Brush.linearGradient(listOf(VioletPrimary, ElectricBlue))),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(Icons.Rounded.Person, null, tint = TextPrimary, modifier = Modifier.size(42.dp))
+                                    }
+                                }
 
                             Spacer(modifier = Modifier.height(10.dp))
 
@@ -224,6 +248,18 @@ fun ProfileScreen(
                             }
                         }
                     }
+                }
+            }
+
+                // Download App, Share Link & Version Update Card
+                item(key = "profile_download_app_card") {
+                    DownloadAppFeatureCard(
+                        state = distributionState,
+                        onDownloadAppClick = onDownloadAppClick,
+                        onUpdateAppClick = onUpdateAppClick,
+                        onShareAppClick = onShareAppClick,
+                        onOpenSettingsClick = onOpenSettings
+                    )
                 }
 
                 // Editable Profile Fields

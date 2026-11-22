@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -53,6 +54,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -65,11 +67,16 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.example.auth.signOut
+import com.example.data.distribution.AppDistributionManager
+import com.example.data.distribution.AppDistributionState
+import com.example.data.distribution.AppDistributionStore
+import com.example.data.distribution.LaunchActionResult
 import com.example.data.repository.VideoChatRepository
 import com.example.ui.components.AdsterraAdUnit
 import com.example.ui.components.AdsterraBannerCard
 import com.example.ui.components.AdsterraStickyBannerBar
 import com.example.ui.components.BottomNavBar
+import com.example.ui.components.DownloadOptionsModalSheet
 import com.example.ui.components.NotificationsSheet
 import com.example.ui.components.TopHeaderBar
 import com.example.ui.screens.AuthScreen
@@ -79,6 +86,7 @@ import com.example.ui.screens.ChatThreadScreen
 import com.example.ui.screens.DiscoverScreen
 import com.example.ui.screens.HomeScreen
 import com.example.ui.screens.ProfileScreen
+import com.example.ui.screens.SettingsScreen
 import com.example.ui.screens.VideoCallScreen
 import com.example.ui.theme.BadgeRed
 import com.example.ui.theme.CardSurfaceElevated
@@ -96,6 +104,7 @@ import com.google.firebase.Firebase
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -170,6 +179,14 @@ fun MainAppShell(currentUserId: String) {
     val statusBanner by viewModel.statusBanner.collectAsStateWithLifecycle()
     val rewardTimer by viewModel.rewardTimer.collectAsStateWithLifecycle()
 
+    val distributionStore = remember(context) { AppDistributionStore(context.applicationContext) }
+    val distributionState by distributionStore.state.collectAsStateWithLifecycle(
+        initialValue = AppDistributionState()
+    )
+    var showSettings by remember { mutableStateOf(false) }
+    var showDownloadSheet by remember { mutableStateOf(false) }
+    var downloadFallbackReason by remember { mutableStateOf<String?>(null) }
+
     val snackbarHostState = remember { SnackbarHostState() }
     LaunchedEffect(statusBanner) {
         val message = statusBanner
@@ -179,12 +196,39 @@ fun MainAppShell(currentUserId: String) {
         }
     }
 
+    val handleDownloadOrUpdate: () -> Unit = {
+        if (distributionState.hasPlayStoreUrl) {
+            when (val res = AppDistributionManager.openGooglePlayStore(context, distributionState.playStoreUrl)) {
+                is LaunchActionResult.Opened -> {
+                    scope.launch { snackbarHostState.showSnackbar("Opening ${res.channel}...") }
+                }
+                is LaunchActionResult.Unavailable -> {
+                    downloadFallbackReason = res.reason
+                    showDownloadSheet = true
+                }
+            }
+        } else {
+            downloadFallbackReason = "Google Play listing is not configured or published yet. Use the Official APK download option or configure links in Settings."
+            showDownloadSheet = true
+        }
+    }
+
+    val handleShareApp: () -> Unit = {
+        when (val res = AppDistributionManager.shareAppDownloadLink(context, distributionState)) {
+            is LaunchActionResult.Opened -> Unit
+            is LaunchActionResult.Unavailable -> {
+                downloadFallbackReason = res.reason
+                showDownloadSheet = true
+            }
+        }
+    }
+
     val userDiamonds = (userProfileState as? UiState.Success)?.data?.diamonds ?: 10000L
     val conversations = (conversationsState as? UiState.Success)?.data ?: emptyList()
     val unreadCount = conversations.sumOf { it.unreadCount }.toInt()
 
     // Navigate back to Home tab if on a secondary tab when pressing Back
-    BackHandler(enabled = selectedTab != MainTab.HOME && activeChatCreator == null && activeCall == null) {
+    BackHandler(enabled = selectedTab != MainTab.HOME && activeChatCreator == null && activeCall == null && !showSettings) {
         viewModel.selectTab(MainTab.HOME)
     }
 
@@ -202,15 +246,6 @@ fun MainAppShell(currentUserId: String) {
 
             Scaffold(
                 containerColor = Color.Transparent,
-                snackbarHost = {
-                    SnackbarHost(hostState = snackbarHostState) { data ->
-                        Snackbar(
-                            snackbarData = data,
-                            containerColor = CardSurfaceElevated,
-                            contentColor = TextPrimary
-                        )
-                    }
-                },
                 bottomBar = {
                     if (!useRail) {
                         Column(modifier = Modifier.fillMaxWidth()) {
@@ -336,8 +371,13 @@ fun MainAppShell(currentUserId: String) {
                                 MainTab.PROFILE -> ProfileScreen(
                                     userProfileState = userProfileState,
                                     rewardTimer = rewardTimer,
+                                    distributionState = distributionState,
                                     onClaimDailyReward = viewModel::claimDailyReward,
                                     onSaveProfile = viewModel::updateProfile,
+                                    onDownloadAppClick = handleDownloadOrUpdate,
+                                    onUpdateAppClick = handleDownloadOrUpdate,
+                                    onShareAppClick = handleShareApp,
+                                    onOpenSettings = { showSettings = true },
                                     onSignOut = {
                                         signOut(
                                             credentialManager = credentialManager,
@@ -400,6 +440,97 @@ fun MainAppShell(currentUserId: String) {
             )
         }
 
+        if (showSettings) {
+            SettingsScreen(
+                distributionState = distributionState,
+                userProfileState = userProfileState,
+                onBack = { showSettings = false },
+                onDownloadAppClick = handleDownloadOrUpdate,
+                onUpdateAppClick = handleDownloadOrUpdate,
+                onShareAppClick = handleShareApp,
+                onSaveDistributionConfig = { playUrl, apkUrl, verName, verCode, notes ->
+                    scope.launch {
+                        distributionStore.saveConfig(
+                            playStoreUrl = playUrl,
+                            apkDownloadUrl = apkUrl,
+                            latestVersionName = verName,
+                            latestVersionCode = verCode,
+                            releaseNotes = notes
+                        ).onSuccess {
+                            snackbarHostState.showSnackbar("Distribution links saved")
+                        }.onFailure { err ->
+                            snackbarHostState.showSnackbar(err.message ?: "Invalid URL configuration")
+                        }
+                    }
+                },
+                onResetDistributionConfig = {
+                    scope.launch {
+                        distributionStore.resetConfig()
+                        snackbarHostState.showSnackbar("Reset to default release config")
+                    }
+                },
+                onTogglePreferences = { beauty, hd ->
+                    val current = (userProfileState as? UiState.Success)?.data
+                    viewModel.updateProfile(
+                        displayName = current?.displayName?.ifBlank { "VideoChat User" } ?: "VideoChat User",
+                        country = current?.country?.ifBlank { "India" } ?: "India",
+                        bio = current?.bio ?: "",
+                        beautyFilterEnabled = beauty,
+                        hdVideoEnabled = hd
+                    )
+                },
+                onSignOut = {
+                    showSettings = false
+                    signOut(
+                        credentialManager = credentialManager,
+                        scope = scope
+                    )
+                }
+            )
+        }
+
+        if (showDownloadSheet) {
+            DownloadOptionsModalSheet(
+                state = distributionState,
+                fallbackReason = downloadFallbackReason,
+                onOpenPlayStore = {
+                    when (val res = AppDistributionManager.openGooglePlayStore(context, distributionState.playStoreUrl)) {
+                        is LaunchActionResult.Opened -> {
+                            showDownloadSheet = false
+                            scope.launch { snackbarHostState.showSnackbar("Opening ${res.channel}...") }
+                        }
+                        is LaunchActionResult.Unavailable -> {
+                            downloadFallbackReason = res.reason
+                        }
+                    }
+                },
+                onDownloadOfficialApk = {
+                    when (val res = AppDistributionManager.downloadOfficialApk(context, distributionState.apkDownloadUrl)) {
+                        is LaunchActionResult.Opened -> {
+                            showDownloadSheet = false
+                            scope.launch { snackbarHostState.showSnackbar("Starting ${res.channel}...") }
+                        }
+                        is LaunchActionResult.Unavailable -> {
+                            downloadFallbackReason = res.reason
+                        }
+                    }
+                },
+                onShareLink = {
+                    when (val res = AppDistributionManager.shareAppDownloadLink(context, distributionState)) {
+                        is LaunchActionResult.Opened -> showDownloadSheet = false
+                        is LaunchActionResult.Unavailable -> {
+                            downloadFallbackReason = res.reason
+                        }
+                    }
+                },
+                onOpenSettings = {
+                    showDownloadSheet = false
+                    showSettings = true
+                },
+                onDismiss = { showDownloadSheet = false }
+            )
+        }
+
         if (showNotifications) {
             NotificationsSheet(
                 conversations = conversations,
@@ -407,6 +538,21 @@ fun MainAppShell(currentUserId: String) {
                 onClaimReward = viewModel::claimDailyReward,
                 onOpenChat = viewModel::openChatWith,
                 onDismiss = { viewModel.openNotifications(false) }
+            )
+        }
+
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+                .imePadding()
+                .padding(horizontal = 16.dp, vertical = 16.dp)
+        ) { data ->
+            Snackbar(
+                snackbarData = data,
+                containerColor = CardSurfaceElevated,
+                contentColor = TextPrimary
             )
         }
     }
