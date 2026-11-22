@@ -197,7 +197,7 @@ class VideoChatViewModel(
                 val profile = (userProfileState.value as? UiState.Success)?.data
                 val lastClaim = profile?.lastRewardClaimedAt
                 if (lastClaim == null) {
-                    _rewardTimer.value = RewardTimerState(canClaim = true, formattedCountdown = "23:59:47")
+                    _rewardTimer.value = RewardTimerState(canClaim = true, formattedCountdown = "Ready Now!")
                 } else {
                     val remaining = (86400L - (Timestamp.now().seconds - lastClaim.seconds)).coerceAtLeast(0L)
                     if (remaining == 0L) {
@@ -303,9 +303,13 @@ class VideoChatViewModel(
 
     fun toggleFavorite(creator: Creator) {
         viewModelScope.launch {
-            repository.toggleFavoriteCreator(currentUserId, creator).onSuccess { isFav ->
-                _statusBanner.value = if (isFav) "${creator.name} added to Favorites" else "${creator.name} removed from Favorites"
-            }
+            repository.toggleFavoriteCreator(currentUserId, creator)
+                .onSuccess { isFav ->
+                    _statusBanner.value = if (isFav) "${creator.name} added to Favorites" else "${creator.name} removed from Favorites"
+                }
+                .onFailure { err ->
+                    _statusBanner.value = err.message ?: "Unable to update favorite status"
+                }
         }
     }
 
@@ -369,14 +373,20 @@ class VideoChatViewModel(
                 callId = session.callId,
                 durationSeconds = session.elapsedSeconds,
                 diamondsSpent = session.diamondsSpent
-            )
-            _statusBanner.value = "Call with ${session.creator.name} ended (${formatDuration(session.elapsedSeconds)})"
+            ).onSuccess {
+                _statusBanner.value = "Call with ${session.creator.name} ended (${formatDuration(session.elapsedSeconds)})"
+            }.onFailure { err ->
+                _statusBanner.value = err.message ?: "Call ended (sync pending)"
+            }
         }
     }
 
     fun deleteCall(callId: String) {
         viewModelScope.launch {
             repository.deleteCallRecord(currentUserId, callId)
+                .onFailure { err ->
+                    _statusBanner.value = err.message ?: "Unable to delete call record"
+                }
         }
     }
 

@@ -417,7 +417,7 @@ class VideoChatRepository(
                 if (giftDiamonds > 0L) {
                     val currentDiamonds = userSnap.getLong("diamonds") ?: 0L
                     if (currentDiamonds < giftDiamonds) {
-                        throw IllegalStateException("Not enough diamonds! Claim your Daily Reward or top up.")
+                        throw IllegalStateException("Not enough diamonds! Claim your free Daily Reward every 24 hours.")
                     }
                     tx.update(
                         userRef,

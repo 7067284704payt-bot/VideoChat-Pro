@@ -36,6 +36,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -118,7 +119,7 @@ fun DailyRewardBanner(
                     verticalArrangement = Arrangement.Center
                 ) {
                     Text(
-                        text = "Daily Reward",
+                        text = stringResource(id = R.string.daily_reward_title),
                         style = MaterialTheme.typography.labelLarge,
                         color = TextPrimary,
                         fontWeight = FontWeight.SemiBold

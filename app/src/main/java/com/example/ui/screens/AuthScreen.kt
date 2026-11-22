@@ -48,6 +48,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -204,7 +205,7 @@ fun AuthScreen(
                     border = BorderStroke(1.dp, SkyCyan.copy(alpha = 0.35f))
                 ) {
                     Text(
-                        text = "Connect • Chat • Video Call",
+                        text = stringResource(id = R.string.tagline),
                         style = MaterialTheme.typography.labelLarge,
                         color = SkyCyan,
                         textAlign = TextAlign.Center,
@@ -376,7 +377,7 @@ fun AuthScreen(
                                 }
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Text(
-                                    text = "Sign in with Google",
+                                    text = stringResource(id = R.string.sign_in_google),
                                     style = MaterialTheme.typography.titleMedium,
                                     fontSize = 16.sp,
                                     fontWeight = FontWeight.Bold,

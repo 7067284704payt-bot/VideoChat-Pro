@@ -35,7 +35,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
-import com.example.R
 import com.example.data.model.Conversation
 import com.example.data.model.Creator
 import com.example.data.model.CreatorCatalog
